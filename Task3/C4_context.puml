@@ -1,0 +1,41 @@
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+LAYOUT_TOP_DOWN()
+LAYOUT_WITH_LEGEND()
+
+Person(owner, "Собственник", "Пользователь мобильного приложения")
+
+System_Boundary(prop, "PropDevelopment") {
+  System(bff, "tenant-mobile-api (BFF)", "REST/GraphQL. Авторизация (OIDC), валидация, агрегация, аудит")
+  System(tenant, "tenant-core-app", "Приложение для предоставления услуг собственникам")
+  System(inbound, "Inbound Webhook Gateway", "Приём событий от партнёра: mTLS + JWS, allowlist, idempotency")
+  System(outbound, "Outbound Integration Client", "mTLS + OAuth2 (Client Credentials/JWT), retries, CB")
+  System(netfw, "Network Firewall")
+}
+
+Rel(owner, netfw, "HTTPS 443")
+Rel(bff, tenant, "REST/gRPC")
+Rel(netfw, bff, "Проксирование/политики",)
+
+System_Boundary(partner, "Партнёр «Умный дом»") {
+  System(part_api, "Платформа партнёра (Cloud API)", "REST, Webhooks; каталоги устройств/доступов")
+  System(edge, "Edge-шлюз в ЖК", "VPN/IPsec ↔ облако; буферизация/очередь")
+  System(domophone, "Интеллектуальный домофон", "Face/biometry у партнёра")
+  System(barrier, "Интеллектуальный шлагбаум", "LPR (распозн. номеров)")
+  System(webhook, "Webhook → PropDev", "mTLS + JWS; nonce/TTL; allowlist; идемпотентность")
+}
+
+Rel(bff, tenant, "Бизнес-операции ЖКУ", "REST/gRPC (internal)")
+Rel(bff, outbound, "Вызовы внешних функций (команды/статусы)", "internal")
+
+
+Rel(outbound, part_api, "REST", "mTLS + OAuth2 (client_credentials/JWT)")
+Rel(part_api, inbound, "Webhooks/события (распознан/открыт/отказ)", "mTLS + JWS, nonce/TTL, allowlist, idempotency")
+Rel(edge, part_api, "Транспорт и синхронизация", "VPN/IPsec, HTTPS")
+Rel(domophone, edge, "События/видео/идентификаторы", "")
+Rel(barrier, edge, "События/идентификаторы LPR", "")
+
+Rel(inbound, tenant, "Передача валидированных событий", "internal")
+
+SHOW_LEGEND()
+@enduml
